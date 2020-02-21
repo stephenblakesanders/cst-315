@@ -20,7 +20,7 @@
 	printf("*COMMAND LINE INTERPRETER                                     \n");
 	printf("*TO RUN A COMMAND SIMPLY TYPE YOUR COMMAND AND PRESS 'ENTER' *\n");
 	printf("*EXAMPLE: ls -a                                              *\n");
-	printf("*TO EXIT TYPE 'q'                                            *\n");
+	printf("*TO EXIT TYPE 'exit'                                          *\n");
 	printf("**************************************************************\n");
 	}
 
