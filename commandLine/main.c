@@ -24,7 +24,7 @@
 	printf("**************************************************************\n");
 	}
 
-	/* Print out "MY_SHELL" */
+	/* Print out "$lopes: " */
 	void displayPrompt(){
 		printf("$lopes: ");
 	}
