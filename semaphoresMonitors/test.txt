@@ -1,107 +1,57 @@
-
-#include <utility>
-#include <shared_mutex>
-
-
-template <class T>
-class monitor
+#include <vector>
+#include <IceUtil/IceUtil.h>
+// ...
+ 
+Queue q;
+ 
+class ReaderThread : public IceUtil::Thread
 {
-private:
-    T obj;
-    typedef std::shared_timed_mutex mutex_type; // You can also use boost::shared_mutex, or std::shared_mutex from C++17
-    mutable mutex_type shared_mutex;
-
-public:
-    monitor() = default;
-
-    explicit
-    monitor(const T& _obj)
-        : obj{_obj}
-    {}
-
-    explicit
-    monitor(T&& _obj)
-        : obj{std::move(_obj)}
-    {}
-
-    monitor(const monitor&) = delete;
-    monitor& operator=(const monitor&) = delete;
-
-    template <typename F>
-    auto exec_ro(F f) const // add "-> decltype(f(obj))" for C++11
+    virtual void run() 
     {
-        std::shared_lock<mutex_type> shared_lock{shared_mutex};
-        return f(obj);
-    }
-
-    template <typename F>
-    auto exec_rw(F f)
-    {
-        std::unique_lock<mutex_type> unique_lock{shared_mutex};
-        return f(obj);
+        for(int i = 0; i < 100; ++i)
+        {
+            cout << q.get() << endl;
+        }
     }
 };
-
-
-// example usage:
-// compile with g++ -std=c++14 example.cpp -o example -fopenmp
-#include <iostream>
-#include "monitor.hpp"
-
-int main()
+ 
+class WriterThread : public IceUtil::Thread
 {
-    monitor<int> mi{5};
-    
-    #pragma omp parallel num_threads(4)
-    
-    #pragma omp parallel
-    mi.exec_ro([](const int& i) {
-        std::cout << "The value is " << i << std::endl;
-        std::cout << "This will " << "overlap with " << "other threads" << std::endl;
-    });
-    
-    #pragma omp parallel
-    mi.exec_rw([](int& i){
-        std::cout << "The value is " << i << std::endl;
-        std::cout << "We increment the value" << std::endl;
-        ++i;
-        std::cout << "This will not " << "overlap with " << "other threads" << std::endl;
-        std::cout << "The value is now " << i << std::endl;
-    });
+    virtual void run() 
+    {
+        for(int i = 0; i < 100; ++i)
+        {
+            q.put(i);
+        }
+    }
+};
+ 
+int
+main()
+{
+    vector<IceUtil::ThreadControl> threads;
+    int i;
+ 
+    // Create five reader threads and start them
+    //
+    for(i = 0; i < 5; ++i)
+    {
+        IceUtil::ThreadPtr t = new ReaderThread;
+        threads.push_back(t->start());
+    }
+ 
+    // Create five writer threads and start them
+    //
+    for(i = 0; i < 5; ++i)
+    {
+        IceUtil::ThreadPtr t = new WriterThread;
+        threads.push_back(t->start());
+    }
+ 
+    // Wait for all threads to finish
+    //
+    for(vector<IceUtil::ThreadControl>::iterator i = threads.begin(); i != threads.end(); ++i)
+    {
+        i->join();
+    }
 }
-
-
-#include <stdio.h> 
-#include <pthread.h> 
-#include <semaphore.h> 
-#include <unistd.h> 
-  
-sem_t mutex; 
-  
-void* thread(void* arg) 
-{ 
-    //wait 
-    sem_wait(&mutex); 
-    printf("\nEntered..\n"); 
-  
-    //critical section 
-    sleep(4); 
-      
-    //signal 
-    printf("\nJust Exiting...\n"); 
-    sem_post(&mutex); 
-} 
-  
-  
-int main() 
-{ 
-    sem_init(&mutex, 0, 1); 
-    pthread_t t1,t2; 
-    pthread_create(&t1,NULL,thread,NULL); 
-    sleep(2); 
-    pthread_create(&t2,NULL,thread,NULL); 
-    pthread_join(t1,NULL); 
-    pthread_join(t2,NULL); 
-    sem_destroy(&mutex); 
-    return 0; 
-} 
