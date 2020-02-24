@@ -1,49 +1,74 @@
 
-#include <IceUtil/Monitor.h>
- 
-template<class T> class Queue : public IceUtil::Monitor<IceUtil::Mutex>
+#include <utility>
+#include <shared_mutex>
+
+
+template <class T>
+class monitor
 {
-public:
-    Queue() : _waitingReaders(0) {}
- 
-    void put(const T& item)
-    {
-        IceUtil::Monitor<IceUtil::Mutex>::Lock lock(*this);
-        _q.push_back(item);
-        if(_waitingReaders)
-        {
-            notify();
-        }
-    }
- 
-    T get()
-    {
-        IceUtil::Monitor<IceUtil::Mutex>::Lock lock(*this);
-        while(_q.size() == 0)
-        {
-            try 
-            {
-                ++_waitingReaders;
-                wait();
-                --_waitingReaders;
-            }
-            catch (...)
-            {
-                --_waitingReaders;
-                throw;
-            }
-        }
-        T item = _q.front();
-        _q.pop_front();
-        return item;
-    }
- 
 private:
-    list<T> _q;
-    short _waitingReaders;
+    T obj;
+    typedef std::shared_timed_mutex mutex_type; // You can also use boost::shared_mutex, or std::shared_mutex from C++17
+    mutable mutex_type shared_mutex;
+
+public:
+    monitor() = default;
+
+    explicit
+    monitor(const T& _obj)
+        : obj{_obj}
+    {}
+
+    explicit
+    monitor(T&& _obj)
+        : obj{std::move(_obj)}
+    {}
+
+    monitor(const monitor&) = delete;
+    monitor& operator=(const monitor&) = delete;
+
+    template <typename F>
+    auto exec_ro(F f) const // add "-> decltype(f(obj))" for C++11
+    {
+        std::shared_lock<mutex_type> shared_lock{shared_mutex};
+        return f(obj);
+    }
+
+    template <typename F>
+    auto exec_rw(F f)
+    {
+        std::unique_lock<mutex_type> unique_lock{shared_mutex};
+        return f(obj);
+    }
 };
 
 
+// example usage:
+// compile with g++ -std=c++14 example.cpp -o example -fopenmp
+#include <iostream>
+#include "monitor.hpp"
+
+int main()
+{
+    monitor<int> mi{5};
+    
+    #pragma omp parallel num_threads(4)
+    
+    #pragma omp parallel
+    mi.exec_ro([](const int& i) {
+        std::cout << "The value is " << i << std::endl;
+        std::cout << "This will " << "overlap with " << "other threads" << std::endl;
+    });
+    
+    #pragma omp parallel
+    mi.exec_rw([](int& i){
+        std::cout << "The value is " << i << std::endl;
+        std::cout << "We increment the value" << std::endl;
+        ++i;
+        std::cout << "This will not " << "overlap with " << "other threads" << std::endl;
+        std::cout << "The value is now " << i << std::endl;
+    });
+}
 
 
 #include <stdio.h> 
