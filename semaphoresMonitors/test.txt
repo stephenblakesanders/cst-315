@@ -55,3 +55,56 @@ main()
         i->join();
     }
 }
+
+
+
+
+
+namespace IceUtil
+{
+    class Time;
+ 
+    class ThreadControl 
+    {
+    public:
+#ifdef _WIN32
+        typedef DWORD ID;
+#else
+        typedef pthread_t ID;
+#endif
+ 
+        ThreadControl();
+#ifdef _WIN32
+        ThreadControl(HANDLE, DWORD);
+#else
+        ThreadControl(explicit pthread_t);
+#endif
+        ID id() const;
+ 
+        void join();
+        void detach();
+ 
+        static void sleep(const Time&);
+        static void yield();
+ 
+        bool operator==(const ThreadControl&) const;
+        bool operator!=(const ThreadControl&) const;
+ 
+    };
+ 
+    class Thread :virtual public Shared
+    {
+    public:
+        virtual void run() = 0;
+ 
+        ThreadControl start(size_t stBytes = 0);
+        ThreadControl start(size_t stBytes, int priority);
+        ThreadControl getThreadControl() const;
+        bool isAlive() const;
+ 
+        bool operator==(const Thread&) const;
+        bool operator!=(const Thread&) const;
+        bool operator<(const Thread&) const;
+    };
+    typedef Handle<Thread> ThreadPtr;
+}
